@@ -48,8 +48,8 @@ type Scanner struct {
 	// eg. keep track of a parents folder or the path to a cover
 	// we just saw that we need to commit in the post children
 	// callback
-	curFolders *stack.Stack
-	curCover   string
+	curFolders     *stack.Stack
+	curFolderCover string
 	// then the rest are for stats and cleanup at the very end
 	seenTracks    map[int]struct{} // set of p keys
 	seenFolders   map[int]struct{} // set of p keys
@@ -196,11 +196,18 @@ func (s *Scanner) callbackItem(fullPath string, info *godirwalk.Dirent) error {
 		return errors.Wrap(err, "stating link to dir")
 	}
 	if isDir {
+		if f := s.curFolders.Peek(); f != nil {
+			f.HasTracksOrDir = true
+		}
+		if s.trTxOpen {
+			s.trTx.Commit()
+			s.trTxOpen = false
+		}
 		return s.handleFolder(it)
 	}
 	lowerFilename := strings.ToLower(filename)
 	if _, ok := coverFilenames[lowerFilename]; ok {
-		s.curCover = filename
+		s.curFolderCover = filename
 		return nil
 	}
 	ext := path.Ext(filename)
@@ -208,6 +215,13 @@ func (s *Scanner) callbackItem(fullPath string, info *godirwalk.Dirent) error {
 		return nil
 	}
 	if _, ok := mime.Types[ext[1:]]; ok {
+		if f := s.curFolders.Peek(); f != nil {
+			f.HasTracksOrDir = true
+		}
+		if !s.trTxOpen {
+			s.trTx = s.db.Begin()
+			s.trTxOpen = true
+		}
 		return s.handleTrack(it)
 	}
 	return nil
@@ -215,7 +229,7 @@ func (s *Scanner) callbackItem(fullPath string, info *godirwalk.Dirent) error {
 
 func (s *Scanner) callbackPost(fullPath string, info *godirwalk.Dirent) error {
 	defer func() {
-		s.curCover = ""
+		s.curFolderCover = ""
 	}()
 	if s.trTxOpen {
 		s.trTx.Commit()
@@ -224,11 +238,11 @@ func (s *Scanner) callbackPost(fullPath string, info *godirwalk.Dirent) error {
 	// begin taking the current folder off the stack and add it's
 	// parent, cover that we found, etc.
 	folder := s.curFolders.Pop()
-	if !folder.ReceivedPaths {
+	if !folder.ReceivedPaths || !folder.HasTracksOrDir {
 		return nil
 	}
 	folder.ParentID = s.curFolders.PeekID()
-	folder.Cover = s.curCover
+	folder.Cover = s.curFolderCover
 	s.db.Save(folder)
 	// we only log changed folders
 	log.Printf("processed folder `%s`\n",
@@ -252,13 +266,6 @@ func decoded(in string) string {
 // ## begin handlers
 
 func (s *Scanner) handleFolder(it *item) error {
-	if s.trTxOpen {
-		// a transaction still being open when we handle a folder can
-		// happen if there is a folder that contains /both/ tracks and
-		// sub folders
-		s.trTx.Commit()
-		s.trTxOpen = false
-	}
 	folder := &db.Album{}
 	defer func() {
 		// folder's id will come from early return
@@ -289,10 +296,6 @@ func (s *Scanner) handleFolder(it *item) error {
 }
 
 func (s *Scanner) handleTrack(it *item) error {
-	if !s.trTxOpen {
-		s.trTx = s.db.Begin()
-		s.trTxOpen = true
-	}
 	// ** begin set track basics
 	track := &db.Track{}
 	err := s.trTx.

@@ -130,27 +130,28 @@ type Play struct {
 }
 
 type Album struct {
-	ID            int `gorm:"primary_key"`
-	UpdatedAt     time.Time
-	ModifiedAt    time.Time
-	LeftPath      string `gorm:"unique_index:idx_left_path_right_path"`
-	RightPath     string `gorm:"not null; unique_index:idx_left_path_right_path" sql:"default: null"`
-	RightPathUDec string `sql:"default: null"`
-	Parent        *Album
-	ParentID      int    `sql:"default: null; type:int REFERENCES albums(id) ON DELETE CASCADE"`
-	Cover         string `sql:"default: null"`
-	TagArtist     *Artist
-	TagArtistID   int `sql:"default: null; type:int REFERENCES artists(id) ON DELETE CASCADE"`
-	TagGenre      *Genre
-	TagGenreID    int    `sql:"default: null; type:int REFERENCES genres(id) ON DELETE CASCADE"`
-	TagTitle      string `sql:"default: null"`
-	TagTitleUDec  string `sql:"default: null"`
-	TagBrainzID   string `sql:"default: null"`
-	TagYear       int    `sql:"default: null"`
-	Tracks        []*Track
-	ChildCount    int  `sql:"-"`
-	ReceivedPaths bool `gorm:"-"`
-	ReceivedTags  bool `gorm:"-"`
+	ID             int `gorm:"primary_key"`
+	UpdatedAt      time.Time
+	ModifiedAt     time.Time
+	LeftPath       string `gorm:"unique_index:idx_left_path_right_path"`
+	RightPath      string `gorm:"not null; unique_index:idx_left_path_right_path" sql:"default: null"`
+	RightPathUDec  string `sql:"default: null"`
+	Parent         *Album
+	ParentID       int    `sql:"default: null; type:int REFERENCES albums(id) ON DELETE CASCADE"`
+	Cover          string `sql:"default: null"`
+	TagArtist      *Artist
+	TagArtistID    int `sql:"default: null; type:int REFERENCES artists(id) ON DELETE CASCADE"`
+	TagGenre       *Genre
+	TagGenreID     int    `sql:"default: null; type:int REFERENCES genres(id) ON DELETE CASCADE"`
+	TagTitle       string `sql:"default: null"`
+	TagTitleUDec   string `sql:"default: null"`
+	TagBrainzID    string `sql:"default: null"`
+	TagYear        int    `sql:"default: null"`
+	Tracks         []*Track
+	ChildCount     int  `sql:"-"`
+	ReceivedPaths  bool `gorm:"-"`
+	ReceivedTags   bool `gorm:"-"`
+	HasTracksOrDir bool `gorm:"-"`
 }
 
 func (a *Album) IndexRightPath() string {
